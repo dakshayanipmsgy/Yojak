@@ -54,17 +54,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$errorMessage) {
 
     if ($action === 'forward') {
         $targetUserId = $_POST['target_user_id'] ?? '';
+        $dueDateInput = trim($_POST['due_date'] ?? '');
+        $dueDate = null;
+
         if ($targetUserId === '') {
             $errorMessage = 'Please select a user to forward the document to.';
+        } elseif ($dueDateInput === '') {
+            $errorMessage = 'Please select the required by (due date).';
         } elseif (($document['current_owner'] ?? '') !== ($_SESSION['user_id'] ?? '')) {
             $errorMessage = 'Only the current owner can forward this document.';
         } else {
-            $result = moveDocument($deptId, $docId, $targetUserId, $_SESSION['user_id'], 'pending');
-            if ($result['success']) {
-                $successMessage = $result['message'];
-                $document = read_json($documentPath);
+            $parsedDate = DateTime::createFromFormat('Y-m-d', $dueDateInput);
+            if ($parsedDate === false || $parsedDate->format('Y-m-d') !== $dueDateInput) {
+                $errorMessage = 'Invalid due date provided. Please use the picker to select a date.';
             } else {
-                $errorMessage = $result['message'];
+                $dueDate = $parsedDate->format('Y-m-d');
+                $result = moveDocument($deptId, $docId, $targetUserId, $_SESSION['user_id'], 'pending', $dueDate);
+                if ($result['success']) {
+                    $successMessage = $result['message'];
+                    $document = read_json($documentPath);
+                } else {
+                    $errorMessage = $result['message'];
+                }
             }
         }
     } elseif ($action === 'save_edits') {
@@ -186,6 +197,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$errorMessage) {
                                                 <option value="<?php echo htmlspecialchars($user['id']); ?>"><?php echo htmlspecialchars(($user['name'] ?? $user['id']) . ' (' . ($user['id'] ?? '') . ')'); ?></option>
                                             <?php endforeach; ?>
                                         </select>
+                                    </div>
+                                    <div class="form-group" style="width: 100%;">
+                                        <label for="due_date">Required By (Due Date)</label>
+                                        <input type="date" id="due_date" name="due_date" value="<?php echo htmlspecialchars($document['due_date'] ?? ''); ?>" required>
                                     </div>
                                     <button type="submit">Forward</button>
                                 </form>

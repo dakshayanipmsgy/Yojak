@@ -153,9 +153,10 @@ if (!function_exists('moveDocument')) {
      * @param string $targetUserId
      * @param string $initiatorId
      * @param string|null $newStatus
+     * @param string|null $dueDate     Date in YYYY-MM-DD format to mark when the document is required.
      * @return array{success: bool, message: string}
      */
-    function moveDocument(string $deptId, string $docId, string $targetUserId, string $initiatorId, ?string $newStatus = 'pending'): array
+    function moveDocument(string $deptId, string $docId, string $targetUserId, string $initiatorId, ?string $newStatus = 'pending', ?string $dueDate = null): array
     {
         $deptPath = __DIR__ . '/storage/departments/' . $deptId;
         $documentPath = $deptPath . '/documents/' . $docId . '.json';
@@ -177,6 +178,12 @@ if (!function_exists('moveDocument')) {
             $document['status'] = $newStatus;
         }
 
+        if ($dueDate !== null) {
+            $document['due_date'] = $dueDate;
+        } elseif (!array_key_exists('due_date', $document)) {
+            $document['due_date'] = null;
+        }
+
         $historyEntry = [
             'action' => 'moved',
             'from' => $previousOwner,
@@ -184,6 +191,10 @@ if (!function_exists('moveDocument')) {
             'time' => date('c'),
             'by' => $initiatorId,
         ];
+
+        if (array_key_exists('due_date', $document)) {
+            $historyEntry['due_date'] = $document['due_date'];
+        }
 
         if (!isset($document['history']) || !is_array($document['history'])) {
             $document['history'] = [];

@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($targetUserId === '') {
                         $errorMessage = 'Please select a user to send the document to.';
                     } else {
-                        $moveResult = moveDocument($deptId, $docId, $targetUserId, $_SESSION['user_id'], 'pending');
+                        $moveResult = moveDocument($deptId, $docId, $targetUserId, $_SESSION['user_id'], 'pending', null);
                         if ($moveResult['success']) {
                             $successMessage = 'Document sent successfully (ID: ' . htmlspecialchars($docId) . ').';
                         } else {

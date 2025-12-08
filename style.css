@@ -215,6 +215,29 @@ body {
     background: #ffecec;
 }
 
+.table tr.expired {
+    background: #ffe5e5;
+}
+
+.table tr.urgent {
+    background: #fff3e0;
+}
+
+.due-date-value {
+    font-weight: 700;
+}
+
+.overdue-label {
+    color: #b3261e;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.due-today-label {
+    color: #d35400;
+    font-weight: 700;
+}
+
 .badge {
     display: inline-block;
     padding: 4px 8px;
