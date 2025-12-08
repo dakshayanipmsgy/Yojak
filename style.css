@@ -18,6 +18,73 @@ body {
     color: var(--text);
 }
 
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 24px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.navbar-left,
+.navbar-center,
+.navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.navbar-center {
+    justify-content: center;
+    flex: 1;
+}
+
+.brand-mark {
+    font-weight: 800;
+    color: var(--primary-dark);
+    letter-spacing: 0.5px;
+}
+
+.dept-label {
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+.nav-link {
+    color: var(--primary-dark);
+    text-decoration: none;
+    font-weight: 700;
+    padding: 8px 10px;
+    border-radius: 8px;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.nav-link:hover {
+    background: #eef2ff;
+}
+
+.nav-button {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--primary);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    border: 1px solid var(--primary-dark);
+}
+
+.welcome {
+    color: var(--muted);
+    font-weight: 600;
+}
+
 .dashboard-shell {
     min-height: 100vh;
     display: grid;

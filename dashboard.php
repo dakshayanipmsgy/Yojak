@@ -1,8 +1,8 @@
 <?php
-session_start();
+require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/functions.php';
 
-if (!isset($_SESSION['role_id'], $_SESSION['user_id'])) {
+if (!isset($_SESSION['role_id'])) {
     header('Location: index.php');
     exit;
 }
@@ -230,6 +230,7 @@ $isGeneralUser = false;
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <?php include __DIR__ . '/navbar.php'; ?>
     <main class="dashboard-shell">
         <section class="dashboard-card">
             <?php if ($roleId === 'superadmin'): ?>
@@ -319,7 +320,7 @@ $isGeneralUser = false;
                             <a class="button-as-link" href="create_document.php">Generate Document</a>
                         </div>
                     </div>
-                    <div class="panel">
+                    <div class="panel" id="inbox">
                         <h3>Inbox</h3>
                         <?php if (empty($inboxDocs)): ?>
                             <p class="muted">No documents in your inbox.</p>
@@ -346,7 +347,7 @@ $isGeneralUser = false;
                             </table>
                         <?php endif; ?>
                     </div>
-                    <div class="panel">
+                    <div class="panel" id="sent-items">
                         <h3>Sent Items</h3>
                         <?php if (empty($outboxDocs)): ?>
                             <p class="muted">No documents have been sent yet.</p>
@@ -388,7 +389,7 @@ $isGeneralUser = false;
                         </div>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" id="manage-roles">
                         <h3>Manage Roles</h3>
                         <form class="inline-form" method="post" autocomplete="off">
                             <input type="hidden" name="action" value="add_role">
@@ -420,7 +421,7 @@ $isGeneralUser = false;
                         <?php endif; ?>
                     </div>
 
-                    <div class="panel">
+                    <div class="panel" id="manage-users">
                         <h3>Manage Users</h3>
                         <form class="inline-form" method="post" autocomplete="off">
                             <input type="hidden" name="action" value="add_user">
