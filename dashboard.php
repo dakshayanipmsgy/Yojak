@@ -184,6 +184,7 @@ $isGeneralUser = false;
     }
 
     $documentsPath = $deptPath . '/documents';
+    $currentDate = date('Y-m-d');
     if (is_dir($documentsPath)) {
         foreach (scandir($documentsPath) as $file) {
             if ($file === '.' || $file === '..' || !str_ends_with($file, '.json')) {
@@ -201,11 +202,23 @@ $isGeneralUser = false;
             }
 
             if (($doc['current_owner'] ?? '') === ($_SESSION['user_id'] ?? '')) {
+                $dueDate = $doc['due_date'] ?? null;
+                $urgency = 'normal';
+                if ($dueDate) {
+                    if ($currentDate > $dueDate) {
+                        $urgency = 'expired';
+                    } elseif ($currentDate === $dueDate) {
+                        $urgency = 'urgent';
+                    }
+                }
+
                 $inboxDocs[] = [
                     'id' => $doc['id'] ?? '',
                     'title' => $doc['title'] ?? '',
                     'from' => $lastHistory['from'] ?? ($doc['created_by'] ?? ''),
                     'time' => $lastHistory['time'] ?? ($doc['created_at'] ?? ''),
+                    'due_date' => $dueDate,
+                    'urgency' => $urgency,
                 ];
             }
 
@@ -217,6 +230,21 @@ $isGeneralUser = false;
                 ];
             }
         }
+    }
+    if (!empty($inboxDocs)) {
+        $urgencyOrder = ['expired' => 0, 'urgent' => 1, 'normal' => 2];
+        usort($inboxDocs, function (array $a, array $b) use ($urgencyOrder) {
+            $aPriority = $urgencyOrder[$a['urgency'] ?? 'normal'] ?? 2;
+            $bPriority = $urgencyOrder[$b['urgency'] ?? 'normal'] ?? 2;
+
+            if ($aPriority !== $bPriority) {
+                return $aPriority <=> $bPriority;
+            }
+
+            $timeA = strtotime($a['time'] ?? '0');
+            $timeB = strtotime($b['time'] ?? '0');
+            return $timeB <=> $timeA;
+        });
     }
     $isGeneralUser = true;
 }
@@ -308,6 +336,9 @@ $isGeneralUser = false;
                     </div>
                     <div class="actions">
                         <span class="badge">ID: <?php echo htmlspecialchars($deptId); ?></span>
+                        <?php if (!$isGeneralUser): ?>
+                            <a href="backup.php" class="btn-primary button-as-link">Download Department Data (.zip)</a>
+                        <?php endif; ?>
                         <a href="index.php" class="btn-secondary button-as-link">Back to Login</a>
                     </div>
                 </div>
@@ -330,15 +361,28 @@ $isGeneralUser = false;
                                     <tr>
                                         <th>Title</th>
                                         <th>Received From</th>
+                                        <th>Due</th>
                                         <th>Date</th>
                                         <th></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($inboxDocs as $doc): ?>
-                                        <tr>
+                                        <tr class="<?php echo htmlspecialchars($doc['urgency'] !== 'normal' ? $doc['urgency'] : ''); ?>">
                                             <td><?php echo htmlspecialchars($doc['title']); ?></td>
                                             <td><?php echo htmlspecialchars($deptUsersMap[$doc['from']] ?? $doc['from']); ?></td>
+                                            <td>
+                                                <?php if (!empty($doc['due_date'])): ?>
+                                                    <div class="due-date-value"><?php echo htmlspecialchars(date('M d, Y', strtotime($doc['due_date']))); ?></div>
+                                                    <?php if (($doc['urgency'] ?? '') === 'expired'): ?>
+                                                        <div class="overdue-label">OVERDUE</div>
+                                                    <?php elseif (($doc['urgency'] ?? '') === 'urgent'): ?>
+                                                        <div class="due-today-label">Due Today</div>
+                                                    <?php endif; ?>
+                                                <?php else: ?>
+                                                    <span class="muted">No due date</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td><?php echo htmlspecialchars(date('M d, Y H:i', strtotime($doc['time'] ?? 'now'))); ?></td>
                                             <td><a class="button-as-link" href="view_document.php?id=<?php echo urlencode($doc['id']); ?>">Open</a></td>
                                         </tr>
