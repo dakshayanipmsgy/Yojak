@@ -68,6 +68,138 @@ if (!function_exists('generate_id')) {
     }
 }
 
+if (!function_exists('getDepartmentUsers')) {
+    /**
+     * Retrieve all users for a given department.
+     *
+     * @param string $deptId
+     * @return array<int, array>
+     */
+    function getDepartmentUsers(string $deptId): array
+    {
+        $usersPath = __DIR__ . '/storage/departments/' . $deptId . '/users/users.json';
+        $users = read_json($usersPath);
+        return is_array($users) ? $users : [];
+    }
+}
+
+if (!function_exists('generate_document_id')) {
+    /**
+     * Generate a unique document identifier for the department store.
+     */
+    function generate_document_id(string $deptPath): string
+    {
+        $documentsDir = rtrim($deptPath, '/');
+        $documentsDir .= '/documents';
+
+        if (!is_dir($documentsDir)) {
+            mkdir($documentsDir, 0755, true);
+        }
+
+        $year = date('Y');
+        $maxCounter = 0;
+
+        foreach (scandir($documentsDir) as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            if (!preg_match('/^DOC_' . $year . '_(\d{4})\.json$/', $entry, $matches)) {
+                continue;
+            }
+
+            $counter = (int) $matches[1];
+            if ($counter > $maxCounter) {
+                $maxCounter = $counter;
+            }
+        }
+
+        $nextCounter = $maxCounter + 1;
+        $candidate = 'DOC_' . $year . '_' . str_pad((string) $nextCounter, 4, '0', STR_PAD_LEFT);
+
+        while (file_exists($documentsDir . '/' . $candidate . '.json')) {
+            $nextCounter++;
+            $candidate = 'DOC_' . $year . '_' . str_pad((string) $nextCounter, 4, '0', STR_PAD_LEFT);
+        }
+
+        return $candidate;
+    }
+}
+
+if (!function_exists('append_master_log')) {
+    /**
+     * Append a line to the immutable master log for the department.
+     */
+    function append_master_log(string $deptPath, string $line): void
+    {
+        $logDir = rtrim($deptPath, '/') . '/logs';
+        if (!is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+
+        $logPath = $logDir . '/master_log.txt';
+        $timestamp = date('c');
+        $entry = '[' . $timestamp . '] ' . $line . PHP_EOL;
+        file_put_contents($logPath, $entry, FILE_APPEND | LOCK_EX);
+    }
+}
+
+if (!function_exists('moveDocument')) {
+    /**
+     * Move a document to another user within the same department and log the action.
+     *
+     * @param string $deptId
+     * @param string $docId
+     * @param string $targetUserId
+     * @param string $initiatorId
+     * @param string|null $newStatus
+     * @return array{success: bool, message: string}
+     */
+    function moveDocument(string $deptId, string $docId, string $targetUserId, string $initiatorId, ?string $newStatus = 'pending'): array
+    {
+        $deptPath = __DIR__ . '/storage/departments/' . $deptId;
+        $documentPath = $deptPath . '/documents/' . $docId . '.json';
+
+        $users = getDepartmentUsers($deptId);
+        $userIds = array_column($users, 'id');
+        if (!in_array($targetUserId, $userIds, true)) {
+            return ['success' => false, 'message' => 'Target user does not exist in this department.'];
+        }
+
+        $document = read_json($documentPath);
+        if (!is_array($document)) {
+            return ['success' => false, 'message' => 'Document not found.'];
+        }
+
+        $previousOwner = $document['current_owner'] ?? null;
+        $document['current_owner'] = $targetUserId;
+        if ($newStatus !== null) {
+            $document['status'] = $newStatus;
+        }
+
+        $historyEntry = [
+            'action' => 'moved',
+            'from' => $previousOwner,
+            'to' => $targetUserId,
+            'time' => date('c'),
+            'by' => $initiatorId,
+        ];
+
+        if (!isset($document['history']) || !is_array($document['history'])) {
+            $document['history'] = [];
+        }
+        $document['history'][] = $historyEntry;
+
+        if (!write_json($documentPath, $document)) {
+            return ['success' => false, 'message' => 'Failed to update document.'];
+        }
+
+        append_master_log($deptPath, $docId . ' moved from ' . ($previousOwner ?? 'unknown') . ' to ' . $targetUserId);
+
+        return ['success' => true, 'message' => 'Document moved successfully.'];
+    }
+}
+
 if (!function_exists('slugify_label')) {
     /**
      * Convert a human-readable label to a filesystem-safe slug.

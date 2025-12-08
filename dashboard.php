@@ -14,6 +14,9 @@ $creationSuccess = null;
 $creationError = null;
 $teamSuccess = null;
 $teamError = null;
+$inboxDocs = [];
+$outboxDocs = [];
+$deptUsersMap = [];
 $departments = [];
 $deptMeta = [];
 $deptRoles = [];
@@ -175,6 +178,46 @@ $isGeneralUser = false;
     $deptPath = __DIR__ . '/storage/departments/' . $deptId;
     $metaPath = $deptPath . '/department.json';
     $deptMeta = read_json($metaPath) ?? ['id' => $deptId, 'name' => $deptId];
+    $deptUsers = getDepartmentUsers($deptId);
+    foreach ($deptUsers as $user) {
+        $deptUsersMap[$user['id'] ?? ''] = $user['name'] ?? ($user['id'] ?? '');
+    }
+
+    $documentsPath = $deptPath . '/documents';
+    if (is_dir($documentsPath)) {
+        foreach (scandir($documentsPath) as $file) {
+            if ($file === '.' || $file === '..' || !str_ends_with($file, '.json')) {
+                continue;
+            }
+
+            $doc = read_json($documentsPath . '/' . $file);
+            if (!is_array($doc)) {
+                continue;
+            }
+
+            $lastHistory = null;
+            if (isset($doc['history']) && is_array($doc['history']) && !empty($doc['history'])) {
+                $lastHistory = $doc['history'][count($doc['history']) - 1];
+            }
+
+            if (($doc['current_owner'] ?? '') === ($_SESSION['user_id'] ?? '')) {
+                $inboxDocs[] = [
+                    'id' => $doc['id'] ?? '',
+                    'title' => $doc['title'] ?? '',
+                    'from' => $lastHistory['from'] ?? ($doc['created_by'] ?? ''),
+                    'time' => $lastHistory['time'] ?? ($doc['created_at'] ?? ''),
+                ];
+            }
+
+            if (($doc['created_by'] ?? '') === ($_SESSION['user_id'] ?? '') && ($doc['current_owner'] ?? '') !== ($_SESSION['user_id'] ?? '')) {
+                $outboxDocs[] = [
+                    'id' => $doc['id'] ?? '',
+                    'title' => $doc['title'] ?? '',
+                    'current_owner' => $doc['current_owner'] ?? '',
+                ];
+            }
+        }
+    }
     $isGeneralUser = true;
 }
 ?>
@@ -275,6 +318,58 @@ $isGeneralUser = false;
                         <div class="actions" style="flex-wrap: wrap;">
                             <a class="button-as-link" href="create_document.php">Generate Document</a>
                         </div>
+                    </div>
+                    <div class="panel">
+                        <h3>Inbox</h3>
+                        <?php if (empty($inboxDocs)): ?>
+                            <p class="muted">No documents in your inbox.</p>
+                        <?php else: ?>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Received From</th>
+                                        <th>Date</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($inboxDocs as $doc): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($doc['title']); ?></td>
+                                            <td><?php echo htmlspecialchars($deptUsersMap[$doc['from']] ?? $doc['from']); ?></td>
+                                            <td><?php echo htmlspecialchars(date('M d, Y H:i', strtotime($doc['time'] ?? 'now'))); ?></td>
+                                            <td><a class="button-as-link" href="view_document.php?id=<?php echo urlencode($doc['id']); ?>">Open</a></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php endif; ?>
+                    </div>
+                    <div class="panel">
+                        <h3>Sent Items</h3>
+                        <?php if (empty($outboxDocs)): ?>
+                            <p class="muted">No documents have been sent yet.</p>
+                        <?php else: ?>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Title</th>
+                                        <th>Currently With</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($outboxDocs as $doc): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($doc['title']); ?></td>
+                                            <td><?php echo htmlspecialchars($deptUsersMap[$doc['current_owner']] ?? $doc['current_owner']); ?></td>
+                                            <td><a class="button-as-link" href="view_document.php?id=<?php echo urlencode($doc['id']); ?>">Open</a></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php endif; ?>
                     </div>
                 <?php else: ?>
                     <?php if ($teamError): ?>

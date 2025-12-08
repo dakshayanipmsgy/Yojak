@@ -28,49 +28,102 @@ $selectedContractorId = $_POST['contractor_id'] ?? '';
 $selectedTemplateId = $_POST['template_id'] ?? '';
 $generatedHtml = null;
 $errorMessage = null;
+$successMessage = null;
+$documentTitle = '';
+$deptUsers = getDepartmentUsers($deptId);
 $selectionDisabled = empty($contractors) || empty($templates);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $templateMeta = null;
-    foreach ($templates as $template) {
-        if (($template['id'] ?? '') === $selectedTemplateId) {
-            $templateMeta = $template;
-            break;
-        }
-    }
+    $action = $_POST['action'] ?? 'generate';
 
-    $contractorData = null;
-    foreach ($contractors as $contractor) {
-        if (($contractor['id'] ?? '') === $selectedContractorId) {
-            $contractorData = $contractor;
-            break;
-        }
-    }
+    if ($action === 'save' || $action === 'send') {
+        $documentTitle = trim($_POST['title'] ?? '');
+        $generatedHtml = $_POST['content'] ?? '';
+        $templateTitle = $_POST['template_title'] ?? '';
 
-    if (!$templateMeta) {
-        $errorMessage = 'Template not found.';
-    } elseif (!$contractorData) {
-        $errorMessage = 'Contractor not found.';
-    } else {
-        $templateFile = $templatesDir . '/' . ($templateMeta['filename'] ?? '');
-        if (!file_exists($templateFile)) {
-            $errorMessage = 'Template file missing on disk.';
+        if ($documentTitle === '') {
+            $documentTitle = $templateTitle ?: 'Untitled Document';
+        }
+
+        if ($generatedHtml === '') {
+            $errorMessage = 'Document content is missing. Please regenerate the document.';
         } else {
-            $templateContent = file_get_contents($templateFile);
-            if ($templateContent === false) {
-                $errorMessage = 'Unable to read template content.';
-            } else {
-                $replacements = [
-                    '{{department_name}}' => htmlspecialchars($meta['name'] ?? $deptId),
-                    '{{contractor_name}}' => htmlspecialchars($contractorData['name'] ?? ''),
-                    '{{contractor_address}}' => htmlspecialchars($contractorData['address'] ?? ''),
-                    '{{contractor_pan}}' => htmlspecialchars($contractorData['pan'] ?? ''),
-                    '{{contractor_gst}}' => htmlspecialchars($contractorData['gst'] ?? ''),
-                    '{{contractor_mobile}}' => htmlspecialchars($contractorData['mobile'] ?? ''),
-                    '{{current_date}}' => date('d-m-Y'),
-                ];
+            $docId = generate_document_id($deptPath);
+            $documentData = [
+                'id' => $docId,
+                'title' => $documentTitle,
+                'content' => $generatedHtml,
+                'created_by' => $_SESSION['user_id'],
+                'created_at' => date('c'),
+                'current_owner' => $_SESSION['user_id'],
+                'status' => 'draft',
+                'history' => [],
+            ];
 
-                $generatedHtml = str_replace(array_keys($replacements), array_values($replacements), $templateContent);
+            $documentPath = $deptPath . '/documents/' . $docId . '.json';
+            if (!write_json($documentPath, $documentData)) {
+                $errorMessage = 'Failed to save document file. Please try again.';
+            } else {
+                if ($action === 'send') {
+                    $targetUserId = $_POST['target_user_id'] ?? '';
+                    if ($targetUserId === '') {
+                        $errorMessage = 'Please select a user to send the document to.';
+                    } else {
+                        $moveResult = moveDocument($deptId, $docId, $targetUserId, $_SESSION['user_id'], 'pending');
+                        if ($moveResult['success']) {
+                            $successMessage = 'Document sent successfully (ID: ' . htmlspecialchars($docId) . ').';
+                        } else {
+                            $errorMessage = $moveResult['message'];
+                        }
+                    }
+                } else {
+                    $successMessage = 'Document saved as draft (ID: ' . htmlspecialchars($docId) . ').';
+                }
+            }
+        }
+    } else {
+        $templateMeta = null;
+        foreach ($templates as $template) {
+            if (($template['id'] ?? '') === $selectedTemplateId) {
+                $templateMeta = $template;
+                break;
+            }
+        }
+
+        $contractorData = null;
+        foreach ($contractors as $contractor) {
+            if (($contractor['id'] ?? '') === $selectedContractorId) {
+                $contractorData = $contractor;
+                break;
+            }
+        }
+
+        if (!$templateMeta) {
+            $errorMessage = 'Template not found.';
+        } elseif (!$contractorData) {
+            $errorMessage = 'Contractor not found.';
+        } else {
+            $templateFile = $templatesDir . '/' . ($templateMeta['filename'] ?? '');
+            if (!file_exists($templateFile)) {
+                $errorMessage = 'Template file missing on disk.';
+            } else {
+                $templateContent = file_get_contents($templateFile);
+                if ($templateContent === false) {
+                    $errorMessage = 'Unable to read template content.';
+                } else {
+                    $replacements = [
+                        '{{department_name}}' => htmlspecialchars($meta['name'] ?? $deptId),
+                        '{{contractor_name}}' => htmlspecialchars($contractorData['name'] ?? ''),
+                        '{{contractor_address}}' => htmlspecialchars($contractorData['address'] ?? ''),
+                        '{{contractor_pan}}' => htmlspecialchars($contractorData['pan'] ?? ''),
+                        '{{contractor_gst}}' => htmlspecialchars($contractorData['gst'] ?? ''),
+                        '{{contractor_mobile}}' => htmlspecialchars($contractorData['mobile'] ?? ''),
+                        '{{current_date}}' => date('d-m-Y'),
+                    ];
+
+                    $generatedHtml = str_replace(array_keys($replacements), array_values($replacements), $templateContent);
+                    $documentTitle = $templateMeta['title'] ?? 'Generated Document';
+                }
             }
         }
     }
@@ -102,10 +155,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php if ($errorMessage): ?>
                     <div class="status error"><?php echo htmlspecialchars($errorMessage); ?></div>
                 <?php endif; ?>
+                <?php if ($successMessage): ?>
+                    <div class="status success"><?php echo htmlspecialchars($successMessage); ?></div>
+                <?php endif; ?>
                 <?php if (empty($templates) || empty($contractors)): ?>
                     <div class="status error">Please ensure at least one template and one contractor exist for this department.</div>
                 <?php endif; ?>
                 <form method="post" class="inline-form" autocomplete="off">
+                    <input type="hidden" name="action" value="generate">
                     <div class="form-group">
                         <label for="template_id">Template</label>
                         <select id="template_id" name="template_id" required <?php echo $selectionDisabled ? 'disabled' : ''; ?>>
@@ -130,10 +187,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <?php if ($generatedHtml): ?>
                 <div class="panel">
-                    <div class="actions no-print" style="justify-content: flex-end; gap: 8px;">
-                        <button type="button" onclick="window.print()">Print</button>
-                        <button type="button" class="btn-secondary">Save as Draft</button>
-                    </div>
+                    <form method="post" class="inline-form" autocomplete="off">
+                        <input type="hidden" name="template_id" value="<?php echo htmlspecialchars($selectedTemplateId); ?>">
+                        <input type="hidden" name="contractor_id" value="<?php echo htmlspecialchars($selectedContractorId); ?>">
+                        <input type="hidden" name="template_title" value="<?php echo htmlspecialchars($documentTitle); ?>">
+                        <textarea name="content" style="display: none;"><?php echo htmlspecialchars($generatedHtml); ?></textarea>
+                        <div class="form-group" style="width: 100%;">
+                            <label for="title">Document Title</label>
+                            <input id="title" name="title" type="text" value="<?php echo htmlspecialchars($documentTitle); ?>" required>
+                        </div>
+                        <div class="form-group" style="width: 100%;">
+                            <label for="target_user_id">Forward To</label>
+                            <select id="target_user_id" name="target_user_id">
+                                <option value="">Select user</option>
+                                <?php foreach ($deptUsers as $user): ?>
+                                    <?php if (($user['id'] ?? '') === ($_SESSION['user_id'] ?? '')) { continue; } ?>
+                                    <option value="<?php echo htmlspecialchars($user['id']); ?>"><?php echo htmlspecialchars(($user['name'] ?? $user['id']) . ' (' . ($user['id'] ?? '') . ')'); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="muted">Select a user when forwarding the document.</small>
+                        </div>
+                        <div class="actions no-print" style="justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+                            <button type="button" onclick="window.print()">Print</button>
+                            <button type="submit" name="action" value="save" class="btn-secondary">Save as Draft</button>
+                            <button type="submit" name="action" value="send">Send</button>
+                        </div>
+                    </form>
                     <div class="page">
                         <?php echo $generatedHtml; ?>
                     </div>
