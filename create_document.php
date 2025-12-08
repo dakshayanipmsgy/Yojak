@@ -58,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'current_owner' => $_SESSION['user_id'],
                 'status' => 'draft',
                 'history' => [],
+                'note_sheet' => [],
             ];
 
             $documentPath = $deptPath . '/documents/' . $docId . '.json';
