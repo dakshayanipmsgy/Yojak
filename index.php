@@ -3,6 +3,7 @@ session_start();
 
 $authError = $_GET['error'] ?? null;
 $authSuccess = $_GET['success'] ?? null;
+$logoutMessage = ($_GET['msg'] ?? '') === 'logged_out' ? 'You have successfully logged out.' : null;
 
 $isLoggedIn = isset($_SESSION['user_id'], $_SESSION['role_id']);
 if ($isLoggedIn) {
@@ -36,6 +37,9 @@ if ($isLoggedIn) {
 
                 <?php if ($authSuccess): ?>
                     <div class="status success"><?php echo htmlspecialchars($authSuccess); ?></div>
+                <?php endif; ?>
+                <?php if ($logoutMessage): ?>
+                    <div class="status success"><?php echo htmlspecialchars($logoutMessage); ?></div>
                 <?php endif; ?>
 
                 <form method="post" action="login.php" autocomplete="off">

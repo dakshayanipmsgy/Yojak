@@ -1,8 +1,8 @@
 <?php
-session_start();
+require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/functions.php';
 
-if (!isset($_SESSION['role_id'], $_SESSION['user_id'], $_SESSION['dept_id'])) {
+if (!isset($_SESSION['role_id'], $_SESSION['dept_id'])) {
     header('Location: index.php');
     exit;
 }
@@ -66,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <?php include __DIR__ . '/navbar.php'; ?>
     <main class="dashboard-shell">
         <section class="dashboard-card">
             <div class="dashboard-header">
